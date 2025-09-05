@@ -80,7 +80,7 @@ class MyPlugin(Star):
         """删除自己的集会码 格式：/d"""
         logger.info("触发集会码删除指令!")
         group_id = event.get_group_id()
-        user_id = event.get_sender_id()
+        user_id = event.message_obj.sender.nickname
         group_data = self.gather_code_data.get(group_id, {})
         if user_id in group_data:
             del group_data[user_id]

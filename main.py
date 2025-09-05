@@ -33,7 +33,7 @@ class MyPlugin(Star):
         """登记集会码，格式：/i 集会码 [备注]"""
         logger.info("触发集会码登记指令")
         group_id = event.get_group_id()
-        user_id = event.get_sender_id()
+        user_id = event.message_obj.sender.nickname
         key = f"{group_id}_{user_id}"
         # 格式：/i 集会码 [备注]
         args = event.message_str.replace("i", "").strip().split(maxsplit=1)
@@ -68,8 +68,7 @@ class MyPlugin(Star):
         for uid, info in group_data.items():
             code = info.get("code", "")
             desc = info.get("desc", "")
-            mark = info.get("mark", "")
-            result_lines.append(f"用户ID: {uid}\n集会码: {code}\n备注: {desc}\n")
+            result_lines.append(f"用户ID: {uid}\n集会码: {code}\n备注: {desc}")
             result_lines.append(f"--------------------\n")
         yield event.plain_result("\n".join(result_lines))
     

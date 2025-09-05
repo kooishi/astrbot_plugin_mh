@@ -28,9 +28,10 @@ class MyPlugin(Star):
         with open(self.gather_code_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(self.gather_code_data, ensure_ascii=False, indent=2))
 
+    # 登记集会码，格式：/i 集会码 [备注]
     @filter.command("i")
     async def register_code(self, event: AstrMessageEvent):
-        """登记集会码，格式：/i 集会码 [备注]"""
+        """登记集会码 格式：/i 集会码 [备注]"""
         logger.info("触发集会码登记指令")
         group_id = event.get_group_id()
         user_id = event.message_obj.sender.nickname
@@ -55,9 +56,10 @@ class MyPlugin(Star):
             f"已登记集会码：{code}\n备注：{desc}\n标记：MH-{user_id}"
         )
 
+    # 查询集会码，格式：/f
     @filter.command("f")
     async def query_codes(self, event: AstrMessageEvent):
-        """查询当前群所有集会码，格式：/f"""
+        """查询当前群所有集会码 格式：/f"""
         logger.info("触发集会码查询指令!")
         group_id = event.get_group_id()
         group_data = self.gather_code_data.get(group_id, {})
@@ -72,9 +74,10 @@ class MyPlugin(Star):
             result_lines.append(f"--------------------\n")
         yield event.plain_result("\n".join(result_lines))
     
+    # 删除自己的集会码，格式：/d
     @filter.command("d")
     async def delete_code(self, event: AstrMessageEvent):
-        """删除自己的集会码，格式：/d"""
+        """删除自己的集会码 格式：/d"""
         logger.info("触发集会码删除指令!")
         group_id = event.get_group_id()
         user_id = event.get_sender_id()

@@ -57,7 +57,7 @@ class MyPlugin(Star):
 
     @filter.command("f")
     async def query_codes(self, event: AstrMessageEvent):
-        """查询当前群所有集会码，格式：/查码"""
+        """查询当前群所有集会码，格式：/f"""
         logger.info("触发集会码查询指令!")
         group_id = event.get_group_id()
         group_data = self.gather_code_data.get(group_id, {})
@@ -75,7 +75,7 @@ class MyPlugin(Star):
     
     @filter.command("d")
     async def delete_code(self, event: AstrMessageEvent):
-        """删除自己的集会码，格式：/删码"""
+        """删除自己的集会码，格式：/d"""
         logger.info("触发集会码删除指令!")
         group_id = event.get_group_id()
         user_id = event.get_sender_id()

@@ -1,9 +1,11 @@
-# helloworld
+# 怪猎集会码登记
 
-AstrBot 插件模板
+指令：
 
-A template plugin for AstrBot plugin feature
+登记自己的集会码 /i 集会码 [备注]
 
-# 支持
+查询群聊集会码 /f
+
+删除自己的集会码 /d
 
 [帮助文档](https://astrbot.app)

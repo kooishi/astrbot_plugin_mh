@@ -51,8 +51,8 @@ class MyPlugin(Star):
         """登记集会码 格式：/i 集会码 [备注]"""
         logger.info("触发集会码登记指令")
         group_id = event.get_group_id()
-        user_id = event.message_obj.sender.nickname
-        key = f"{group_id}_{user_id}"
+        user_id = event.get_sender_id()
+        user_name = event.message_obj.sender.nickname
         # 格式：/i 集会码 [备注]
         args = event.message_str.replace("i", "").strip().split(maxsplit=1)
         code = args[0] if args else ""
@@ -63,14 +63,16 @@ class MyPlugin(Star):
         # 按群分组，每个群下是用户id和集会码信息
         if group_id not in self.gather_code_data:
             self.gather_code_data[group_id] = {}
-        self.gather_code_data[group_id][user_id] = {
+        self.gather_code_data[group_id][str(user_id)] = {
             "code": code,
             "desc": desc,
-            "mark": f"MH-{user_id}"  # 标记，可自定义
+            "mark": f"MH-{user_name}",  # 标记，可自定义
+            "nick": f"{user_name}",  # 记录QQ昵称，方便管理员删除
+            "qq": str(user_id)  # 新增QQ字段
         }
         self.save_gather_code_data()
         yield event.plain_result(
-            f"已登记集会码：{code}\n备注：{desc}\n标记：MH-{user_id}"
+            f"已登记集会码：{code}\n备注：{desc}\n标记：MH-{user_name}"
         )
 
     # 查询集会码，格式：/f
@@ -87,8 +89,8 @@ class MyPlugin(Star):
         for uid, info in group_data.items():
             code = info.get("code", "")
             desc = info.get("desc", "")
+            result_lines.append(f"--------------------")
             result_lines.append(f"用户ID: {uid}\n集会码: {code}\n备注: {desc}")
-            result_lines.append(f"--------------------\n")
         yield event.plain_result("\n".join(result_lines))
     
     # 删除自己的集会码，格式：/d
@@ -97,7 +99,7 @@ class MyPlugin(Star):
         """删除自己的集会码 格式：/d"""
         logger.info("触发集会码删除指令!")
         group_id = event.get_group_id()
-        user_id = event.message_obj.sender.nickname
+        user_id = event.get_sender_id()
         group_data = self.gather_code_data.get(group_id, {})
         if user_id in group_data:
             del group_data[user_id]
@@ -129,13 +131,33 @@ class MyPlugin(Star):
         self.save_admins_data()
         yield event.plain_result(f"已添加QQ号 {qq} 集会码清除权限。")
 
+    # 删除有权限的QQ号，格式：/deladmin QQ号
+    @filter.command("deladmin")
+    async def del_admin(self, event: AstrMessageEvent):
+        """删除有权限的QQ号，仅astrbot管理员可使用 格式：/deladmin QQ号"""
+        group_id = event.get_group_id()
+        if not event.is_admin():
+            yield event.plain_result("无权限使用。")
+            return
+        args = event.message_str.replace("deladmin", "").strip().split()
+        if not args:
+            yield event.plain_result("请输入要删除的QQ号，例如：/deladmin 123456789")
+            return
+        qq = args[0]
+        if group_id not in self.admins_data or qq not in self.admins_data[group_id]:
+            yield event.plain_result(f"QQ号 {qq} 不在本群权限列表中。")
+            return
+        self.admins_data[group_id].remove(qq)
+        self.save_admins_data()
+        yield event.plain_result(f"已移除QQ号 {qq} 的集会码清除权限。")
+
     # 清空本群所有集会码，格式：/clear
     @filter.command("clear")
     async def clear_codes(self, event: AstrMessageEvent):
         """清空本群所有集会码，仅限群主/管理员 格式：/clear"""
         logger.info("触发集会码清空指令!")
         group_id = event.get_group_id()
-        admin = self.is_admin_qq(group_id, event.message_obj.sender.user_id) or event.is_admin()
+        admin = self.is_admin_qq(group_id, event.get_sender_id) or event.is_admin()
         if not admin:
             yield event.plain_result("无权限使用。")
             return
@@ -151,7 +173,8 @@ class MyPlugin(Star):
     async def delete_user_code(self, event: AstrMessageEvent):
         """删除指定QQ号或昵称的集会码，仅限管理员 格式：/deluser QQ号 或 /deluser 昵称"""
         group_id = event.get_group_id()
-        user_qq = getattr(event.message_obj.sender, "qq", None)
+        user_qq = event.get_sender_id()
+        user_name = event.message_obj.sender.nickname
         if not self.is_admin_qq(group_id, user_qq):
             yield event.plain_result("无权限使用。")
             return
@@ -164,7 +187,7 @@ class MyPlugin(Star):
         found = False
         for uid in list(group_data.keys()):
             info = group_data[uid]
-            if uid == target or info.get("qq") == target:
+            if uid == target or info.get("qq") == target or info.get("nick") == target:
                 del group_data[uid]
                 found = True
         if found:

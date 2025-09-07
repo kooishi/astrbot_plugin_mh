@@ -15,18 +15,35 @@ class MyPlugin(Star):
 
         # 集会码数据文件路径
         self.gather_code_path = f"data/{PLUGIN_NAME}_gather_code.json"
+        # 管理员QQ号数据文件路径
+        self.admins_path = f"data/{PLUGIN_NAME}_admins.json"
 
         # 如果文件不存在则创建空文件
         if not os.path.exists(self.gather_code_path):
             with open(self.gather_code_path, "w", encoding="utf-8") as f:
                 f.write(json.dumps({}, ensure_ascii=False, indent=2))
+        if not os.path.exists(self.admins_path):
+            with open(self.admins_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps({}, ensure_ascii=False, indent=2))
+        
        # 读取文件内容
         with open(self.gather_code_path, "r", encoding="utf-8") as f:
             self.gather_code_data = json.loads(f.read())
+        with open(self.admins_path, "r", encoding="utf-8") as f:
+            self.admins_data = json.loads(f.read())
 
     def save_gather_code_data(self):
         with open(self.gather_code_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(self.gather_code_data, ensure_ascii=False, indent=2))
+
+    def save_admins_data(self):
+        with open(self.admins_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(self.admins_data, ensure_ascii=False, indent=2))
+
+    # 判断QQ号是否在管理员列表中
+    def is_admin_qq(self, group_id, qq):
+        """判断该QQ号是否在本群的管理员列表中"""
+        return group_id in self.admins_data and str(qq) in [str(x) for x in self.admins_data[group_id]]
 
     # 登记集会码，格式：/i 集会码 [备注]
     @filter.command("i")
@@ -89,3 +106,70 @@ class MyPlugin(Star):
             yield event.plain_result("你的集会码已删除。")
         else:
             yield event.plain_result("你没有登记过集会码。")
+
+    # 添加有权限的QQ号，格式：/addadmin QQ号
+    @filter.command("addadmin")
+    async def add_admin(self, event: AstrMessageEvent):
+        """添加有权限的QQ号，仅astrbot管理员可使用 格式：/addadmin QQ号"""
+        group_id = event.get_group_id()
+        if not event.is_admin():
+            yield event.plain_result("无权限使用。")
+            return
+        args = event.message_str.replace("addadmin", "").strip().split()
+        if not args:
+            yield event.plain_result("请输入要添加的QQ号，例如：/addadmin 123456789")
+            return
+        qq = args[0]
+        if group_id not in self.admins_data:
+            self.admins_data[group_id] = []
+        if qq in self.admins_data[group_id]:
+            yield event.plain_result(f"QQ号 {qq} 已有集会码清除权限。")
+            return
+        self.admins_data[group_id].append(qq)
+        self.save_admins_data()
+        yield event.plain_result(f"已添加QQ号 {qq} 集会码清除权限。")
+
+    # 清空本群所有集会码，格式：/clear
+    @filter.command("clear")
+    async def clear_codes(self, event: AstrMessageEvent):
+        """清空本群所有集会码，仅限群主/管理员 格式：/clear"""
+        logger.info("触发集会码清空指令!")
+        group_id = event.get_group_id()
+        admin = self.is_admin_qq(group_id, event.message_obj.sender.user_id) or event.is_admin()
+        if not admin:
+            yield event.plain_result("无权限使用。")
+            return
+        if group_id in self.gather_code_data:
+            self.gather_code_data[group_id] = {}
+            self.save_gather_code_data()
+            yield event.plain_result("本群所有集会码已清空。")
+        else:
+            yield event.plain_result("本群没有登记过集会码。")
+
+    # 删除指定QQ号或昵称的集会码，格式：/deluser QQ号 或 /deluser 昵称
+    @filter.command("deluser")
+    async def delete_user_code(self, event: AstrMessageEvent):
+        """删除指定QQ号或昵称的集会码，仅限管理员 格式：/deluser QQ号 或 /deluser 昵称"""
+        group_id = event.get_group_id()
+        user_qq = getattr(event.message_obj.sender, "qq", None)
+        if not self.is_admin_qq(group_id, user_qq):
+            yield event.plain_result("无权限使用。")
+            return
+        args = event.message_str.replace("deluser", "").strip().split()
+        if not args:
+            yield event.plain_result("请输入要删除的QQ号或昵称，例如：/deluser 123456789 或 /deluser 昵称")
+            return
+        target = args[0]
+        group_data = self.gather_code_data.get(group_id, {})
+        found = False
+        for uid in list(group_data.keys()):
+            info = group_data[uid]
+            if uid == target or info.get("qq") == target:
+                del group_data[uid]
+                found = True
+        if found:
+            self.gather_code_data[group_id] = group_data
+            self.save_gather_code_data()
+            yield event.plain_result(f"已删除 {target} 的集会码。")
+        else:
+            yield event.plain_result(f"未找到 {target} 的集会码。")
